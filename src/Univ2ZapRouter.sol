@@ -9,6 +9,7 @@ import {IUniswapV2Pair} from "lib/v2-core/contracts/interfaces/IUniswapV2Pair.so
 contract Univ2ZapRouter {
     IUniswapV2Router02 public immutable router;
     address public immutable WETH;
+    uint16 public constant BPS = 10_000;  // 100 %
 
     constructor(address _router) { router = IUniswapV2Router02(_router); WETH = router.WETH(); }
 
@@ -18,7 +19,8 @@ contract Univ2ZapRouter {
         address tokenA,
         address tokenB,
         uint256 amountIn,
-        uint256 lpMin,
+        uint16  maxSlippageBps,
+        uint lpMin,
         uint256 deadline
     ) external returns (uint256 liquidity)
     {
@@ -42,7 +44,7 @@ contract Univ2ZapRouter {
             _swapForPair(tokenIn, tokenA, tokenB, amountIn, toSwap, deadline);
 
         liquidity = _addLiquidity(
-            tokenA, tokenB, amtA, amtB, msg.sender, deadline
+            tokenA, tokenB, amtA, amtB, msg.sender, maxSlippageBps, deadline
         );
         require(liquidity >= lpMin, "lp<min");
     }
@@ -167,6 +169,7 @@ contract Univ2ZapRouter {
         uint256 amtA,
         uint256 amtB,
         address to,
+        uint16  slipBps,
         uint256 deadline
     ) internal returns (uint256 liquidity)
     {
@@ -175,11 +178,18 @@ contract Univ2ZapRouter {
 
         (,, liquidity) = router.addLiquidity(
             tokenA, tokenB,
-            amtA,   amtB,
-            1, 1,               // TODO: real slippage mins
+            amtA,        amtB,
+            _minOut(amtA, slipBps),   // real slippage mins 🎉
+            _minOut(amtB, slipBps),
             to,
             deadline
         );
+    }
+
+
+    function _minOut(uint256 amt, uint16 slipBps) internal pure returns (uint256) {
+        require(slipBps <= BPS, "slippage>100%");
+        unchecked { return amt * (BPS - slipBps) / BPS; }
     }
 
 }

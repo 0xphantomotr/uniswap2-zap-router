@@ -34,6 +34,7 @@ contract ZapRoundTrip is Test {
             USDC,              // tokenIn
             USDC, WETH,        // pool tokens
             1_000e6,           // amountIn
+            50,
             1,                 // lpMin
             block.timestamp + 1 hours
         );

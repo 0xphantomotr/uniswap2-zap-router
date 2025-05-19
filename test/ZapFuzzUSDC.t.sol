@@ -23,7 +23,7 @@ contract ZapFuzzUSDC is Test {
         vm.startPrank(user);
         IERC20(USDC).approve(address(zap), type(uint).max);
 
-        uint lp = zap.zapInSingleToken(USDC, USDC, WETH, amt, 1, block.timestamp+1 hours);
+        uint lp = zap.zapInSingleToken(USDC, USDC, WETH, amt, 50, 1, block.timestamp+1 hours);
         IERC20(zap.getPair(USDC, WETH)).approve(address(zap), lp);
         uint out = zap.zapOutSingleToken(USDC, USDC, WETH, lp, 1, block.timestamp+1 hours);
         vm.stopPrank();

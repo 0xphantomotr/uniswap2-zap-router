@@ -39,6 +39,7 @@ contract OptimalVsNaive is Test {
             USDC,               // tokenIn
             USDC, WETH,         // pair tokens
             10_000e6,           // amountIn
+            50,
             1,
             block.timestamp + 1 hours
         );

@@ -27,7 +27,7 @@ contract ZapETH is Test {
         uint lp = zap.zapInSingleToken(
             WETH,
             USDC, WETH,
-            1 ether, 1, block.timestamp + 1 hours
+            1 ether, 50, 1, block.timestamp + 1 hours
         );
         assertGt(lp, 0);
 
