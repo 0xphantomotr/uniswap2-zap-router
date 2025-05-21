@@ -46,7 +46,8 @@ contract ZapRoundTrip is Test {
         uint usdcOut = zap.zapOutSingleToken(
             USDC, USDC, WETH,
             lp,
-            1,                 // outMin
+            50, // maxSlippageBps (0.5%)
+            1,  // outMin
             block.timestamp + 1 hours
         );
 

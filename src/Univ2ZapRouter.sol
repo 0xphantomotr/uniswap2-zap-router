@@ -56,6 +56,7 @@ contract Univ2ZapRouter {
         address tokenA,
         address tokenB,
         uint    lpIn,
+        uint16  maxSlippageBps,
         uint    outMin,
         uint    deadline
     ) external returns (uint amountOut) {
@@ -70,18 +71,44 @@ contract Univ2ZapRouter {
         );
 
         if (tokenOut == tokenA) {
-            _forceApprove(tokenB, address(router), amtB);
-            uint[] memory outs = router.swapExactTokensForTokens(
-                amtB, 0, _buildPath(tokenB, tokenA), address(this), deadline
-            );
-            amountOut = amtA + outs[1];
+            if (amtB > 0) {
+                _forceApprove(tokenB, address(router), amtB);
+                address[] memory path = _buildPath(tokenB, tokenA);
+                uint[] memory expectedAmountsFromSwap = router.getAmountsOut(amtB, path);
+                uint minAmountFromSwap = _minOut(expectedAmountsFromSwap[1], maxSlippageBps);
+
+                uint[] memory actualAmountsFromSwap = router.swapExactTokensForTokens(
+                    amtB,
+                    minAmountFromSwap,
+                    path,
+                    address(this),
+                    deadline
+                );
+                amountOut = amtA + actualAmountsFromSwap[1];
+            } else {
+                amountOut = amtA;
+            }
         } else if (tokenOut == tokenB) {
-            _forceApprove(tokenA, address(router), amtA);
-            uint[] memory outs = router.swapExactTokensForTokens(
-                amtA, 0, _buildPath(tokenA, tokenB), address(this), deadline
-            );
-            amountOut = amtB + outs[1];
-        } else revert("tokenOut");
+            if (amtA > 0) {
+                _forceApprove(tokenA, address(router), amtA);
+                address[] memory path = _buildPath(tokenA, tokenB);
+                uint[] memory expectedAmountsFromSwap = router.getAmountsOut(amtA, path);
+                uint minAmountFromSwap = _minOut(expectedAmountsFromSwap[1], maxSlippageBps);
+
+                uint[] memory actualAmountsFromSwap = router.swapExactTokensForTokens(
+                    amtA,
+                    minAmountFromSwap,
+                    path,
+                    address(this),
+                    deadline
+                );
+                amountOut = amtB + actualAmountsFromSwap[1];
+            } else {
+                amountOut = amtB;
+            }
+        } else {
+            revert("tokenOut");
+        }
 
         require(amountOut >= outMin, "out<min");
         IERC20(tokenOut).transfer(msg.sender, amountOut);

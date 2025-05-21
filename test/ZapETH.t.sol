@@ -34,7 +34,10 @@ contract ZapETH is Test {
         IERC20(zap.getPair(USDC, WETH)).approve(address(zap), lp);
         uint wethOut = zap.zapOutSingleToken(
             WETH, USDC, WETH,
-            lp, 1, block.timestamp + 1 hours
+            lp,
+            50, // maxSlippageBps (0.5%)
+            1,  // outMin
+            block.timestamp + 1 hours
         );
 
         // should return ≥ 0.97 ETH after fees
