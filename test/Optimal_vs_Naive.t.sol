@@ -41,7 +41,8 @@ contract OptimalVsNaive is Test {
             10_000e6,           // amountIn
             50,
             1,
-            block.timestamp + 1 hours
+            block.timestamp + 1 hours,
+            false // feeOnTransfer
         );
 
         vm.stopPrank();

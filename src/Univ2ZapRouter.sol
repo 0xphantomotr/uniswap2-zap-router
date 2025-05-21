@@ -21,7 +21,8 @@ contract Univ2ZapRouter {
         uint256 amountIn,
         uint16  maxSlippageBps,
         uint lpMin,
-        uint256 deadline
+        uint256 deadline,
+        bool feeOnTransfer
     ) external returns (uint256 liquidity)
     {
         require(amountIn > 0, "zero");
@@ -41,7 +42,7 @@ contract Univ2ZapRouter {
 
         // ── Swap & add liquidity (helpers keep stack shallow) ──────────
         (uint256 amtA, uint256 amtB) =
-            _swapForPair(tokenIn, tokenA, tokenB, amountIn, toSwap, deadline);
+            _swapForPair(tokenIn, tokenA, tokenB, amountIn, toSwap, deadline, feeOnTransfer);
 
         liquidity = _addLiquidity(
             tokenA, tokenB, amtA, amtB, msg.sender, maxSlippageBps, deadline
@@ -58,7 +59,8 @@ contract Univ2ZapRouter {
         uint    lpIn,
         uint16  maxSlippageBps,
         uint    outMin,
-        uint    deadline
+        uint    deadline,
+        bool feeOnTransfer
     ) external returns (uint amountOut) {
         require(lpIn > 0, "zero");
 
@@ -77,13 +79,26 @@ contract Univ2ZapRouter {
                 uint[] memory expectedAmountsFromSwap = router.getAmountsOut(amtB, path);
                 uint minAmountFromSwap = _minOut(expectedAmountsFromSwap[1], maxSlippageBps);
 
-                uint[] memory actualAmountsFromSwap = router.swapExactTokensForTokens(
-                    amtB,
-                    minAmountFromSwap,
-                    path,
-                    address(this),
-                    deadline
-                );
+                uint[] memory actualAmountsFromSwap = new uint[](2);
+                if (feeOnTransfer) {
+                    uint balBefore = IERC20(tokenA).balanceOf(address(this));
+                    router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+                        amtB,
+                        minAmountFromSwap,
+                        path,
+                        address(this),
+                        deadline
+                    );
+                    actualAmountsFromSwap[1] = IERC20(tokenA).balanceOf(address(this)) - balBefore;
+                } else {
+                    actualAmountsFromSwap = router.swapExactTokensForTokens(
+                        amtB,
+                        minAmountFromSwap,
+                        path,
+                        address(this),
+                        deadline
+                    );
+                }
                 amountOut = amtA + actualAmountsFromSwap[1];
             } else {
                 amountOut = amtA;
@@ -95,13 +110,26 @@ contract Univ2ZapRouter {
                 uint[] memory expectedAmountsFromSwap = router.getAmountsOut(amtA, path);
                 uint minAmountFromSwap = _minOut(expectedAmountsFromSwap[1], maxSlippageBps);
 
-                uint[] memory actualAmountsFromSwap = router.swapExactTokensForTokens(
-                    amtA,
-                    minAmountFromSwap,
-                    path,
-                    address(this),
-                    deadline
-                );
+                uint[] memory actualAmountsFromSwap = new uint[](2);
+                if (feeOnTransfer) {
+                    uint balBefore = IERC20(tokenB).balanceOf(address(this));
+                    router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+                        amtA,
+                        minAmountFromSwap,
+                        path,
+                        address(this),
+                        deadline
+                    );
+                    actualAmountsFromSwap[1] = IERC20(tokenB).balanceOf(address(this)) - balBefore;
+                } else {
+                    actualAmountsFromSwap = router.swapExactTokensForTokens(
+                        amtA,
+                        minAmountFromSwap,
+                        path,
+                        address(this),
+                        deadline
+                    );
+                }
                 amountOut = amtB + actualAmountsFromSwap[1];
             } else {
                 amountOut = amtB;
@@ -173,7 +201,8 @@ contract Univ2ZapRouter {
         address tokenB,
         uint256 amountIn,
         uint256 toSwap,
-        uint256 deadline
+        uint256 deadline,
+        bool feeOnTransfer
     ) internal returns (uint256 amtA, uint256 amtB)
     {
         address[] memory path = _buildPath(
@@ -181,9 +210,18 @@ contract Univ2ZapRouter {
             tokenIn == tokenA ? tokenB : tokenA
         );
 
-        uint256[] memory outs = router.swapExactTokensForTokens(
-            toSwap, 0, path, address(this), deadline
-        );
+        uint256[] memory outs = new uint256[](2);
+        if (feeOnTransfer) {
+            //uint balBefore = IERC20(path[1]).balanceOf(address(this));
+            router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+                toSwap, 0, path, address(this), deadline
+            );
+            outs[1] = IERC20(path[1]).balanceOf(address(this)); // Balance after swap is the amount received
+        } else {
+            outs = router.swapExactTokensForTokens(
+                toSwap, 0, path, address(this), deadline
+            );
+        }
 
         amtA = (tokenIn == tokenA) ? amountIn - toSwap : outs[1];
         amtB = (tokenIn == tokenB) ? amountIn - toSwap : outs[1];

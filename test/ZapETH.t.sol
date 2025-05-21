@@ -27,7 +27,8 @@ contract ZapETH is Test {
         uint lp = zap.zapInSingleToken(
             WETH,
             USDC, WETH,
-            1 ether, 50, 1, block.timestamp + 1 hours
+            1 ether, 50, 1, block.timestamp + 1 hours,
+            false // feeOnTransfer
         );
         assertGt(lp, 0);
 
@@ -37,7 +38,8 @@ contract ZapETH is Test {
             lp,
             50, // maxSlippageBps (0.5%)
             1,  // outMin
-            block.timestamp + 1 hours
+            block.timestamp + 1 hours,
+            false // feeOnTransfer
         );
 
         // should return ≥ 0.97 ETH after fees

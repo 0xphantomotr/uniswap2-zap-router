@@ -36,7 +36,8 @@ contract ZapRoundTrip is Test {
             1_000e6,           // amountIn
             50,
             1,                 // lpMin
-            block.timestamp + 1 hours
+            block.timestamp + 1 hours,
+            false // feeOnTransfer
         );
         assertGt(lp, 0, "LP not minted");
 
@@ -48,7 +49,8 @@ contract ZapRoundTrip is Test {
             lp,
             50, // maxSlippageBps (0.5%)
             1,  // outMin
-            block.timestamp + 1 hours
+            block.timestamp + 1 hours,
+            false // feeOnTransfer
         );
 
         /* sanity: should get most of the USDC back (small loss = trading fees) */

@@ -18,7 +18,7 @@ contract ZapDAI is Test {
     function test_ZapIn_DAI() public {
         vm.startPrank(user);
         IERC20(DAI).approve(address(zap), type(uint).max);
-        uint lp = zap.zapInSingleToken(DAI, DAI, WETH, 5_000e18, 50, 1, block.timestamp+1 hours);
+        uint lp = zap.zapInSingleToken(DAI, DAI, WETH, 5_000e18, 50, 1, block.timestamp+1 hours, false);
         assertGt(lp, 0);
         vm.stopPrank();
     }
