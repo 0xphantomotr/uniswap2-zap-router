@@ -30,6 +30,19 @@ contract ZapRoundTrip is Test {
         IERC20(USDC).approve(address(zap), type(uint).max);
 
         /* ---- zap in USDC → LP ---- */
+        // event ZapIn(
+        //     address indexed sender,
+        //     address indexed tokenIn,
+        //     address indexed pairTokenA,
+        //     address pairTokenB,
+        //     uint256 amountIn,
+        //     uint256 liquidityMinted
+        // );
+        // We check the 3 indexed topics (sender, tokenIn, pairTokenA).
+        // The data part (pairTokenB, amountIn, liquidityMinted) is not strictly checked by this expectEmit call.
+        vm.expectEmit(true, true, true, false);
+        emit Univ2ZapRouter.ZapIn(user, USDC, USDC, WETH, 1_000e6, 0); // placeholder for liquidityMinted
+
         uint lp = zap.zapInSingleToken(
             USDC,              // tokenIn
             USDC, WETH,        // pool tokens
@@ -44,6 +57,19 @@ contract ZapRoundTrip is Test {
         /* ---- zap out LP → USDC ---- */
         IERC20(zap.getPair(USDC, WETH)).approve(address(zap), lp);
 
+        // event ZapOut(
+        //     address indexed sender,
+        //     address indexed tokenOut,
+        //     address indexed pairTokenA,
+        //     address pairTokenB,
+        //     uint256 lpAmount,
+        //     uint256 amountOut
+        // );
+        // We check the 3 indexed topics (sender, tokenOut, pairTokenA).
+        // The data part (pairTokenB, lpAmount, amountOut) is not strictly checked by this expectEmit call.
+        vm.expectEmit(true, true, true, false);
+        emit Univ2ZapRouter.ZapOut(user, USDC, USDC, WETH, lp, 0); // placeholder for amountOut
+
         uint usdcOut = zap.zapOutSingleToken(
             USDC, USDC, WETH,
             lp,
@@ -55,6 +81,48 @@ contract ZapRoundTrip is Test {
 
         /* sanity: should get most of the USDC back (small loss = trading fees) */
         assertGt(usdcOut, 990e6, "slippage too high (>1%)");
+
+        vm.stopPrank();
+    }
+
+    function testRoundTripUSDC_FeeOnTransfer() public {
+        vm.startPrank(user);
+
+        IERC20(USDC).approve(address(zap), type(uint).max);
+
+        // Expect ZapIn event
+        vm.expectEmit(true, true, true, false);
+        emit Univ2ZapRouter.ZapIn(user, USDC, USDC, WETH, 1_000e6, 0);
+
+        uint lp = zap.zapInSingleToken(
+            USDC,
+            USDC, WETH,
+            1_000e6,
+            50,
+            1,
+            block.timestamp + 1 hours,
+            true // feeOnTransfer set to true
+        );
+        assertGt(lp, 0, "LP not minted (feeOnTransfer=true)");
+
+        IERC20(zap.getPair(USDC, WETH)).approve(address(zap), lp);
+
+        // Expect ZapOut event
+        vm.expectEmit(true, true, true, false);
+        emit Univ2ZapRouter.ZapOut(user, USDC, USDC, WETH, lp, 0);
+
+        uint usdcOut = zap.zapOutSingleToken(
+            USDC, USDC, WETH,
+            lp,
+            50,
+            1,
+            block.timestamp + 1 hours,
+            true // feeOnTransfer set to true
+        );
+
+        assertGt(usdcOut, 980e6, "slippage too high (>2%) (feeOnTransfer=true)"); // Adjusted expectation slightly, as router behavior might differ, though unlikely with non-FOT tokens. Should be similar to the false case.
+        // The assertion for usdcOut might need slight adjustment, but with non-FOT tokens, it should be very close to the original.
+        // The primary goal is to ensure this path doesn't revert and executes the intended logic.
 
         vm.stopPrank();
     }

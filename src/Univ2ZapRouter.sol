@@ -5,11 +5,30 @@ import {IUniswapV2Router02} from "v2-periphery/interfaces/IUniswapV2Router02.sol
 import {IERC20}            from "v2-periphery/interfaces/IERC20.sol";
 import {IUniswapV2Factory} from "lib/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 import {IUniswapV2Pair} from "lib/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
+import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 
-contract Univ2ZapRouter {
+contract Univ2ZapRouter is ReentrancyGuard {
     IUniswapV2Router02 public immutable router;
     address public immutable WETH;
     uint16 public constant BPS = 10_000;  // 100 %
+
+    event ZapIn(
+        address indexed sender,
+        address indexed tokenIn,
+        address indexed pairTokenA,
+        address pairTokenB, // Not indexed as it's often paired with tokenIn or WETH
+        uint256 amountIn,
+        uint256 liquidityMinted
+    );
+
+    event ZapOut(
+        address indexed sender,
+        address indexed tokenOut,
+        address indexed pairTokenA,
+        address pairTokenB, // Not indexed for similar reasons
+        uint256 lpAmount,
+        uint256 amountOut
+    );
 
     constructor(address _router) { router = IUniswapV2Router02(_router); WETH = router.WETH(); }
 
@@ -23,7 +42,7 @@ contract Univ2ZapRouter {
         uint lpMin,
         uint256 deadline,
         bool feeOnTransfer
-    ) external returns (uint256 liquidity)
+    ) external nonReentrant returns (uint256 liquidity)
     {
         require(amountIn > 0, "zero");
 
@@ -48,6 +67,7 @@ contract Univ2ZapRouter {
             tokenA, tokenB, amtA, amtB, msg.sender, maxSlippageBps, deadline
         );
         require(liquidity >= lpMin, "lp<min");
+        emit ZapIn(msg.sender, tokenIn, tokenA, tokenB, amountIn, liquidity);
     }
 
 
@@ -61,7 +81,7 @@ contract Univ2ZapRouter {
         uint    outMin,
         uint    deadline,
         bool feeOnTransfer
-    ) external returns (uint amountOut) {
+    ) external nonReentrant returns (uint amountOut) {
         require(lpIn > 0, "zero");
 
         address pair = IUniswapV2Factory(router.factory()).getPair(tokenA, tokenB);
@@ -140,6 +160,7 @@ contract Univ2ZapRouter {
 
         require(amountOut >= outMin, "out<min");
         IERC20(tokenOut).transfer(msg.sender, amountOut);
+        emit ZapOut(msg.sender, tokenOut, tokenA, tokenB, lpIn, amountOut);
     }
 
     // HELPERS
@@ -244,7 +265,7 @@ contract Univ2ZapRouter {
         (,, liquidity) = router.addLiquidity(
             tokenA, tokenB,
             amtA,        amtB,
-            _minOut(amtA, slipBps),   // real slippage mins 🎉
+            _minOut(amtA, slipBps),   // real slippage mins
             _minOut(amtB, slipBps),
             to,
             deadline
