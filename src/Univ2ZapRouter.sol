@@ -21,7 +21,7 @@ contract Univ2ZapRouter is ReentrancyGuard {
     /// @notice The Uniswap V2 Router02 interface.
     IUniswapV2Router02 public immutable router;
     /// @notice The address of Wrapped Ether (WETH) used by the Uniswap V2 Router.
-    address public immutable WETH;
+    address public immutable weth;
     /// @notice Basis points constant, representing 100% (10,000 BPS).
     uint16 public constant BPS = 10_000;
 
@@ -51,7 +51,7 @@ contract Univ2ZapRouter is ReentrancyGuard {
      */
     constructor(address _router) {
         router = IUniswapV2Router02(_router);
-        WETH = router.WETH();
+        weth = router.WETH();
     }
 
     /* ─────────────────────────── ZAP IN ─────────────────────────── */
@@ -70,7 +70,7 @@ contract Univ2ZapRouter is ReentrancyGuard {
         address routerAddress = address(router);
 
         // ── Pull & approve ──────────────────────────────────────────────
-        IERC20(tokenIn).transferFrom(msg.sender, thisAddress, amountIn);
+        require(IERC20(tokenIn).transferFrom(msg.sender, thisAddress, amountIn), "transferFrom failed");
         _forceApprove(tokenIn, routerAddress, amountIn);
 
         // ── Optimal swap size ──────────────────────────────────────────
@@ -107,7 +107,7 @@ contract Univ2ZapRouter is ReentrancyGuard {
         address routerAddress = address(router);
 
         address pair = IUniswapV2Factory(router.factory()).getPair(tokenA, tokenB);
-        IERC20(pair).transferFrom(msg.sender, thisAddress, lpIn);
+        require(IERC20(pair).transferFrom(msg.sender, thisAddress, lpIn), "LP transferFrom failed");
         _forceApprove(pair, routerAddress, lpIn);
 
         (uint256 amtA, uint256 amtB) = router.removeLiquidity(tokenA, tokenB, lpIn, 1, 1, thisAddress, deadline);
@@ -165,7 +165,7 @@ contract Univ2ZapRouter is ReentrancyGuard {
         }
 
         require(amountOut >= outMin, "out<min");
-        IERC20(tokenOut).transfer(msg.sender, amountOut);
+        require(IERC20(tokenOut).transfer(msg.sender, amountOut), "transfer failed");
         emit ZapOut(msg.sender, tokenOut, tokenA, tokenB, lpIn, amountOut);
     }
 
@@ -178,20 +178,8 @@ contract Univ2ZapRouter is ReentrancyGuard {
 
     function _forceApprove(address token, address spender, uint256 amount) internal {
         if (IERC20(token).allowance(address(this), spender) < amount) {
-            IERC20(token).approve(spender, type(uint256).max);
+            require(IERC20(token).approve(spender, type(uint256).max), "approve failed");
         }
-    }
-
-    function pairFor(address a, address b) internal view returns (address) {
-        address factory = router.factory();
-        (address token0, address token1) = a < b ? (a, b) : (b, a);
-        bytes32 salt = keccak256(abi.encodePacked(token0, token1));
-        bytes32 data = keccak256(
-            abi.encodePacked(
-                hex"ff", factory, salt, hex"96e8ac4277198ff8b6f785478aa9a39f403cb768dd3b3ec7b92f4f07e4fd8b27"
-            )
-        );
-        return address(uint160(uint256(data)));
     }
 
     function getPair(address a, address b) external view returns (address) {
